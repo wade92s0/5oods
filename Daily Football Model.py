@@ -117,11 +117,4 @@ if st.button("🔄 Fetch Smart Picks"):
     except Exception as e:
         st.error(f"❌ Error fetching real-time picks: {e}")
 
-
-
-
-               
-     
-
-
-
+   
