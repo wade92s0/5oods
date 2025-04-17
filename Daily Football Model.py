@@ -122,10 +122,3 @@ if st.button("🔄 Fetch Smart Picks"):
                 st.warning("⚠️ Odds below 5. Try different picks.")
     except Exception as e:
         st.error(f"❌ Error fetching real-time picks: {e}")
-
-
-
-
-
-
-   
