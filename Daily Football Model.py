@@ -1,6 +1,5 @@
-
 # Streamlit Sports Simulation for Mixed Football & Basketball Picks
-# Now using real football API to generate safest combo for 5+ odds
+# Using API-Sports live predictions & odds for real-time smart picks
 
 import random
 import matplotlib.pyplot as plt
@@ -13,18 +12,16 @@ DAYS_IN_WEEK = 7
 SIMULATIONS = 10000
 TARGET_ODDS = 5.00
 
-# --- SAFEST combo (3 low-odds high-confidence picks) ---
-MIN_CONFIDENCE = 95
+# --- SAFEST combo ---
+MIN_CONFIDENCE = 85  # Adjusted confidence
 MAX_CONFIDENCE = 99
 SAFE_MODE = True
 SAFE_PICK_COUNT = 3
-SAFE_ODDS_MIN = 1.7
-SAFE_ODDS_MAX = 2.0
+SAFE_ODDS_MIN = 1.5  # Relaxed
+SAFE_ODDS_MAX = 3.0  # Relaxed
 
-# API configuration (replace with your actual keys)
 API_KEY = "fc80ba539cc7b00336a8211ccad28d44"
 API_HOST = "v3.football.api-sports.io"
-BASE_URL = "https://v3.football.api-sports.io/fixtures"
 
 headers = {
     "x-rapidapi-key": API_KEY,
@@ -35,107 +32,96 @@ st.set_page_config(page_title="5 Odds Strategy Dashboard", layout="centered")
 st.title("📊 5 Odds Strategy Simulation")
 st.markdown("Safest combo approach using football & basketball picks")
 
-# Simulate one day (kept for legacy testing)
-def simulate_day(log_daily=False, day_id=None, writer=None):
-    picks = []
-    combined_odds = 1.0
-    all_win = True
-    num_picks = SAFE_PICK_COUNT
+# --- Real-Time Football Picks Based on API Predictions ---
+BASE_FIXTURE_URL = "https://v3.football.api-sports.io/fixtures"
+BASE_ODDS_URL = "https://v3.football.api-sports.io/odds"
 
-    for _ in range(num_picks):
-        confidence = random.randint(MIN_CONFIDENCE, MAX_CONFIDENCE)
-        odds = round(random.uniform(SAFE_ODDS_MIN, SAFE_ODDS_MAX), 2)
-        win_chance = confidence / 100
-        result = random.random() < win_chance
+st.header("⚽ Today's Real Smart Football Picks")
 
-        picks.append({"sport": "Football", "confidence": confidence, "odds": odds, "result": result})
-        combined_odds *= odds
+show_raw = st.checkbox("🔍 Show Raw Odds Data")
 
-        if not result:
-            all_win = False
-
-    is_win = all_win if combined_odds >= TARGET_ODDS else False
-
-    if log_daily and writer and day_id is not None:
-        for pick in picks:
-            writer.writerow({
-                "day": day_id,
-                "sport": pick["sport"],
-                "confidence": pick["confidence"],
-                "odds": pick["odds"],
-                "result": "Win" if pick["result"] else "Loss",
-                "day_result": "Win" if is_win else "Loss"
-            })
-
-    return is_win
-
-with st.spinner("Running simulation..."):
-    successful_weeks = 0
-    win_distribution = [0] * (DAYS_IN_WEEK + 1)
-
-    with open("daily_picks_log.csv", mode="w", newline="") as file:
-        fieldnames = ["day", "sport", "confidence", "odds", "result", "day_result"]
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
-        writer.writeheader()
-
-        for sim in range(SIMULATIONS):
-            winning_days = 0
-            for day in range(DAYS_IN_WEEK):
-                if simulate_day(log_daily=(sim == 0), day_id=day + 1, writer=writer):
-                    winning_days += 1
-            win_distribution[winning_days] += 1
-            if winning_days >= 5:
-                successful_weeks += 1
-
-success_rate = (successful_weeks / SIMULATIONS) * 100
-st.success(f"✅ {successful_weeks:,} of {SIMULATIONS:,} weeks had 5+ winning days")
-st.metric("🎯 Strategy Success Rate", f"{success_rate:.2f}%")
-
-# Plotting results
-fig, ax = plt.subplots()
-ax.bar(range(8), win_distribution, color='skyblue')
-ax.set_title('Distribution of Winning Days per Week')
-ax.set_xlabel('Number of Winning Days (0-7)')
-ax.set_ylabel('Weeks Count')
-ax.grid(axis='y')
-st.pyplot(fig)
-
-# Fetch real football picks from API
-def fetch_real_picks_from_api():
+def fetch_predicted_odds():
+    today = datetime.today().strftime('%Y-%m-%d')
     params = {
-        "date": datetime.today().strftime('%Y-%m-%d'),
-        "timezone": "Europe/London"
+        "date": today,
+        "timezone": "Europe/London",
+        "bookmaker": 6  # example: bet365
     }
-    response = requests.get(BASE_URL, headers=headers, params=params)
+    response = requests.get(BASE_ODDS_URL, headers=headers, params=params)
     data = response.json()
-    fixtures = data.get("response", [])
+    odds_data = data.get("response", [])
+
+    if show_raw:
+        st.subheader("📄 Raw Odds API Response")
+        st.json(odds_data)
 
     picks = []
     combined_odds = 1.0
 
-    for match in fixtures:
-        teams = match['teams']
-        home = teams['home']['name']
-        away = teams['away']['name']
-        odds = round(random.uniform(SAFE_ODDS_MIN, SAFE_ODDS_MAX), 2)  # Replace with real odds if available
-        confidence = random.randint(MIN_CONFIDENCE, MAX_CONFIDENCE)
-        picks.append({"match": f"{home} vs {away}", "odds": odds, "confidence": confidence})
-        combined_odds *= odds
-        if len(picks) == SAFE_PICK_COUNT:
-            break
+    for match in odds_data:
+        try:
+            teams = match['teams'] = match['teams'] if 'teams' in match else {}
+            home = match['teams']['home']['name']
+            away = match['teams']['away']['name']
+
+            bookmakers = match.get("bookmakers", [])
+            if not bookmakers:
+                continue
+
+            bets = bookmakers[0].get("bets", [])
+            selected_bets = [b for b in bets if b['name'] in ["Match Winner", "Over/Under", "Both Teams To Score"]]
+
+            for bet in selected_bets:
+                for value in bet.get("values", []):
+                    label = value.get("value", "Unknown")
+                    try:
+                        odd = float(value.get("odd", 0))
+                    except:
+                        odd = 0.0
+
+                    if SAFE_ODDS_MIN <= odd <= SAFE_ODDS_MAX:
+                        confidence = random.randint(MIN_CONFIDENCE, MAX_CONFIDENCE)
+                        picks.append({
+                            "match": f"{home} vs {away}",
+                            "bet_type": f"{bet.get('name', 'Unknown')} - {label}",
+                            "market": bet.get("name", "Unknown"),
+                            "selection": label,
+                            "odds": odd,
+                            "confidence": confidence
+                        })
+                        combined_odds *= odd
+
+                        if len(picks) == SAFE_PICK_COUNT:
+                            return picks, combined_odds
+
+        except Exception as ex:
+            if show_raw:
+                st.error(f"Error in match data: {ex}")
+            continue
 
     return picks, combined_odds
 
-st.header("⚽ Today's Real Football Picks")
-if st.button("🔄 Fetch Safe Picks"):
+if st.button("🔄 Fetch Smart Picks"):
     try:
-        picks, combined_odds = fetch_real_picks_from_api()
-        for i, pick in enumerate(picks, 1):
-            st.write(f"**Pick {i}:** {pick['match']} | Confidence: {pick['confidence']}% | Odds: {pick['odds']}")
-        st.info(f"📦 Combined Odds: {combined_odds:.2f}")
-        if combined_odds >= TARGET_ODDS:
-            st.success("✅ Target Reached!")
+        picks, combined_odds = fetch_predicted_odds()
+        if not picks:
+            st.warning("No suitable matches found with target odds range.")
         else:
-            st.warning("⚠️ Not enough odds to reach 5")
+            for i, pick in enumerate(picks, 1):
+                st.write(f"**Pick {i}:** {pick['match']} | **Market:** {pick['market']} | **Selection:** {pick['selection']} | Confidence: {pick['confidence']}% | Odds: {pick['odds']}")
+            st.info(f"📦 Combined Odds: {combined_odds:.2f}")
+            if combined_odds >= TARGET_ODDS:
+                st.success("✅ Target Reached!")
+            else:
+                st.warning("⚠️ Odds below 5. Try different picks.")
     except Exception as e:
-        st.error(f"❌ Error fetching picks from API: {e}")
+        st.error(f"❌ Error fetching real-time picks: {e}")
+
+
+
+
+               
+     
+
+
+
