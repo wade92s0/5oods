@@ -1,4 +1,3 @@
-
 # Streamlit Sports Simulation for Mixed Football & Basketball Picks
 # Now using real football API to generate safest combo for 5+ odds
 
@@ -119,7 +118,13 @@ def fetch_real_picks_from_api():
         away = teams['away']['name']
         odds = round(random.uniform(SAFE_ODDS_MIN, SAFE_ODDS_MAX), 2)  # Replace with real odds if available
         confidence = random.randint(MIN_CONFIDENCE, MAX_CONFIDENCE)
-        picks.append({"match": f"{home} vs {away}", "odds": odds, "confidence": confidence})
+        bet_type = random.choice(["Win", "Over 2.5", "Under 2.5"])  # Example types
+        picks.append({
+            "match": f"{home} vs {away}",
+            "odds": odds,
+            "confidence": confidence,
+            "bet_type": bet_type
+        })
         combined_odds *= odds
         if len(picks) == SAFE_PICK_COUNT:
             break
@@ -131,7 +136,7 @@ if st.button("🔄 Fetch Safe Picks"):
     try:
         picks, combined_odds = fetch_real_picks_from_api()
         for i, pick in enumerate(picks, 1):
-            st.write(f"**Pick {i}:** {pick['match']} | Confidence: {pick['confidence']}% | Odds: {pick['odds']}")
+            st.write(f"**Pick {i}:** {pick['match']} | **Bet:** {pick['bet_type']} | Confidence: {pick['confidence']}% | Odds: {pick['odds']}")
         st.info(f"📦 Combined Odds: {combined_odds:.2f}")
         if combined_odds >= TARGET_ODDS:
             st.success("✅ Target Reached!")
@@ -139,3 +144,12 @@ if st.button("🔄 Fetch Safe Picks"):
             st.warning("⚠️ Not enough odds to reach 5")
     except Exception as e:
         st.error(f"❌ Error fetching picks from API: {e}")
+
+
+
+      
+
+
+
+
+        
