@@ -17,8 +17,8 @@ MIN_CONFIDENCE = 85  # Adjusted confidence
 MAX_CONFIDENCE = 99
 SAFE_MODE = True
 SAFE_PICK_COUNT = 3
-SAFE_ODDS_MIN = 1.5  # Relaxed
-SAFE_ODDS_MAX = 3.0  # Relaxed
+SAFE_ODDS_MIN = 1.3  # More relaxed
+SAFE_ODDS_MAX = 3.5  # More relaxed
 
 API_KEY = "fc80ba539cc7b00336a8211ccad28d44"
 API_HOST = "v3.football.api-sports.io"
@@ -40,12 +40,12 @@ st.header("⚽ Today's Real Smart Football Picks")
 
 show_raw = st.checkbox("🔍 Show Raw Odds Data")
 
+
 def fetch_predicted_odds():
     today = datetime.today().strftime('%Y-%m-%d')
     params = {
         "date": today,
-        "timezone": "Europe/London",
-        "bookmaker": 6  # example: bet365
+        "timezone": "Europe/London"
     }
     response = requests.get(BASE_ODDS_URL, headers=headers, params=params)
     data = response.json()
@@ -60,16 +60,21 @@ def fetch_predicted_odds():
 
     for match in odds_data:
         try:
-            teams = match['teams'] = match['teams'] if 'teams' in match else {}
-            home = match['teams']['home']['name']
-            away = match['teams']['away']['name']
+            # Safer access to team names
+            home = match.get('teams', {}).get('home', {}).get('name', 'Unknown')
+            away = match.get('teams', {}).get('away', {}).get('name', 'Unknown')
+
+            if home == 'Unknown' or away == 'Unknown':
+                if show_raw:
+                    st.warning("⚠️ Skipped a match with missing team info.")
+                continue
 
             bookmakers = match.get("bookmakers", [])
             if not bookmakers:
                 continue
 
             bets = bookmakers[0].get("bets", [])
-            selected_bets = [b for b in bets if b['name'] in ["Match Winner", "Over/Under", "Both Teams To Score"]]
+            selected_bets = bets
 
             for bet in selected_bets:
                 for value in bet.get("values", []):
@@ -101,6 +106,7 @@ def fetch_predicted_odds():
 
     return picks, combined_odds
 
+
 if st.button("🔄 Fetch Smart Picks"):
     try:
         picks, combined_odds = fetch_predicted_odds()
@@ -116,5 +122,8 @@ if st.button("🔄 Fetch Smart Picks"):
                 st.warning("⚠️ Odds below 5. Try different picks.")
     except Exception as e:
         st.error(f"❌ Error fetching real-time picks: {e}")
+
+
+
 
    
