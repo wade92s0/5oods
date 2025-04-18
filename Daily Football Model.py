@@ -40,7 +40,6 @@ st.header("⚽ Today's Real Smart Football Picks")
 
 show_raw = st.checkbox("🔍 Show Raw Odds Data")
 
-
 def fetch_predicted_odds():
     today = datetime.today().strftime('%Y-%m-%d')
     params = {
@@ -48,8 +47,13 @@ def fetch_predicted_odds():
         "timezone": "Europe/London"
     }
 
-    response = requests.get(BASE_ODDS_URL, headers=headers, params=params)
-    data = response.json()
+    try:
+        response = requests.get(BASE_ODDS_URL, headers=headers, params=params)
+        data = response.json()
+    except Exception as e:
+        st.error(f"API call failed: {e}")
+        return [], 0.0
+
     odds_data = data.get("response", [])
 
     if show_raw:
@@ -57,7 +61,7 @@ def fetch_predicted_odds():
         st.json(odds_data)
 
     priority_markets = [
-        "Match Winner", "Both Teams To Score", "Over/Under", "Over/Under 2.5"
+        "Match Winner", "1X2", "Both Teams To Score", "BTTS", "Over/Under", "Over/Under 2.5"
     ]
 
     picks = []
@@ -65,21 +69,22 @@ def fetch_predicted_odds():
 
     for match in odds_data:
         try:
-            match_info = match.get("fixture", {})
-            teams_info = match.get("teams", {})
-            home = teams_info.get("home", {}).get("name")
-            away = teams_info.get("away", {}).get("name")
-            if not home or not away:
+            fixture = match.get("fixture", {})
+            teams = match.get("teams", {})
+            home_team = teams.get("home", {}).get("name", "")
+            away_team = teams.get("away", {}).get("name", "")
+            if not home_team or not away_team:
                 continue
+            match_name = f"{home_team} vs {away_team}"
 
             for bookmaker in match.get("bookmakers", []):
                 for bet in bookmaker.get("bets", []):
-                    market = bet.get("name", "Unknown Market")
-                    if not any(pm in market for pm in priority_markets):
+                    market = bet.get("name", "")
+                    if not any(pm.lower() in market.lower() for pm in priority_markets):
                         continue
 
                     for value in bet.get("values", []):
-                        selection = value.get("value", "Unknown")
+                        selection = value.get("value")
                         try:
                             odd = float(value.get("odd", 0))
                         except:
@@ -89,7 +94,7 @@ def fetch_predicted_odds():
                             confidence = random.randint(MIN_CONFIDENCE, MAX_CONFIDENCE)
                             if confidence >= MIN_CONFIDENCE:
                                 picks.append({
-                                    "match": f"{home} vs {away}",
+                                    "match": match_name,
                                     "market": market,
                                     "selection": selection,
                                     "odds": odd,
@@ -101,27 +106,25 @@ def fetch_predicted_odds():
                                     return picks, combined_odds
         except Exception as e:
             if show_raw:
-                st.error(f"Error parsing match data: {e}")
+                st.error(f"Error parsing a match: {e}")
             continue
 
     return picks, combined_odds
 
-
 if st.button("🔄 Fetch Smart Picks"):
-    try:
-        picks, combined_odds = fetch_predicted_odds()
-        if not picks:
-            st.warning("No suitable matches found with target odds range. Try again later or adjust filters.")
-        else:
-            for i, pick in enumerate(picks, 1):
-                st.markdown(f"**Pick {i}:** {pick['match']}  ")
-                st.markdown(f"**Market:** {pick['market']} | **Selection:** {pick['selection']}  ")
-                st.markdown(f"**Confidence:** {pick['confidence']}% | **Odds:** {pick['odds']}\n")
+    picks, combined_odds = fetch_predicted_odds()
+    if not picks:
+        st.warning("⚠️ No suitable matches found. Try again later or relax filters.")
+    else:
+        for i, pick in enumerate(picks, 1):
+            st.markdown(f"**Pick {i}:** {pick['match']}")
+            st.markdown(f"**Market:** {pick['market']} | **Selection:** {pick['selection']}")
+            st.markdown(f"**Confidence:** {pick['confidence']}% | **Odds:** {pick['odds']}")
+            st.markdown("---")
 
-            st.info(f"📦 Combined Odds: {combined_odds:.2f}")
-            if combined_odds >= TARGET_ODDS:
-                st.success("✅ Target Reached!")
-            else:
-                st.warning("⚠️ Odds below 5. Try different picks.")
-    except Exception as e:
-        st.error(f"❌ Error fetching real-time picks: {e}")
+        st.info(f"📦 Combined Odds: {combined_odds:.2f}")
+        if combined_odds >= TARGET_ODDS:
+            st.success("✅ Target Reached!")
+        else:
+            st.warning("⚠️ Odds below 5. Try again.")
+
