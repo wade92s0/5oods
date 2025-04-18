@@ -40,6 +40,7 @@ st.header("⚽ Today's Real Smart Football Picks")
 
 show_raw = st.checkbox("🔍 Show Raw Odds Data")
 
+
 def fetch_predicted_odds():
     today = datetime.today().strftime('%Y-%m-%d')
     params = {
@@ -56,7 +57,7 @@ def fetch_predicted_odds():
         st.json(odds_data)
 
     priority_markets = [
-        "Match Winner", "Both Teams To Score", "Over/Under"
+        "Match Winner", "Both Teams To Score", "Over/Under", "Over/Under 2.5"
     ]
 
     picks = []
@@ -64,15 +65,17 @@ def fetch_predicted_odds():
 
     for match in odds_data:
         try:
-            home = match.get("teams", {}).get("home", {}).get("name")
-            away = match.get("teams", {}).get("away", {}).get("name")
+            match_info = match.get("fixture", {})
+            teams_info = match.get("teams", {})
+            home = teams_info.get("home", {}).get("name")
+            away = teams_info.get("away", {}).get("name")
             if not home or not away:
                 continue
 
             for bookmaker in match.get("bookmakers", []):
                 for bet in bookmaker.get("bets", []):
                     market = bet.get("name", "Unknown Market")
-                    if market not in priority_markets:
+                    if not any(pm in market for pm in priority_markets):
                         continue
 
                     for value in bet.get("values", []):
@@ -102,14 +105,18 @@ def fetch_predicted_odds():
 
     return picks, combined_odds
 
+
 if st.button("🔄 Fetch Smart Picks"):
     try:
         picks, combined_odds = fetch_predicted_odds()
         if not picks:
-            st.warning("No suitable matches found with target odds range.")
+            st.warning("No suitable matches found with target odds range. Try again later or adjust filters.")
         else:
             for i, pick in enumerate(picks, 1):
-                st.write(f"**Pick {i}:** {pick['match']} | **Market:** {pick['market']} | **Selection:** {pick['selection']} | Confidence: {pick['confidence']}% | Odds: {pick['odds']}")
+                st.markdown(f"**Pick {i}:** {pick['match']}  ")
+                st.markdown(f"**Market:** {pick['market']} | **Selection:** {pick['selection']}  ")
+                st.markdown(f"**Confidence:** {pick['confidence']}% | **Odds:** {pick['odds']}\n")
+
             st.info(f"📦 Combined Odds: {combined_odds:.2f}")
             if combined_odds >= TARGET_ODDS:
                 st.success("✅ Target Reached!")
