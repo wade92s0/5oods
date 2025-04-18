@@ -13,12 +13,12 @@ SIMULATIONS = 10000
 TARGET_ODDS = 5.00
 
 # --- SAFEST combo ---
-MIN_CONFIDENCE = 85  # Adjusted confidence
-MAX_CONFIDENCE = 99
+MIN_CONFIDENCE = 80  # More relaxed to allow more matches
+MAX_CONFIDENCE = 100
 SAFE_MODE = True
 SAFE_PICK_COUNT = 3
-SAFE_ODDS_MIN = 1.3  # More relaxed
-SAFE_ODDS_MAX = 3.5  # More relaxed
+SAFE_ODDS_MIN = 1.2  # More relaxed
+SAFE_ODDS_MAX = 4.0  # More relaxed
 
 API_KEY = "fc80ba539cc7b00336a8211ccad28d44"
 API_HOST = "v3.football.api-sports.io"
@@ -87,17 +87,18 @@ def fetch_predicted_odds():
 
                         if SAFE_ODDS_MIN <= odd <= SAFE_ODDS_MAX:
                             confidence = random.randint(MIN_CONFIDENCE, MAX_CONFIDENCE)
-                            picks.append({
-                                "match": f"{home} vs {away}",
-                                "market": market,
-                                "selection": selection,
-                                "odds": odd,
-                                "confidence": confidence
-                            })
-                            combined_odds *= odd
+                            if confidence >= MIN_CONFIDENCE:
+                                picks.append({
+                                    "match": f"{home} vs {away}",
+                                    "market": market,
+                                    "selection": selection,
+                                    "odds": odd,
+                                    "confidence": confidence
+                                })
+                                combined_odds *= odd
 
-                            if len(picks) == SAFE_PICK_COUNT:
-                                return picks, combined_odds
+                                if len(picks) == SAFE_PICK_COUNT:
+                                    return picks, combined_odds
         except Exception as e:
             if show_raw:
                 st.error(f"Error parsing match data: {e}")
