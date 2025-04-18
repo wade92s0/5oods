@@ -13,12 +13,12 @@ SIMULATIONS = 10000
 TARGET_ODDS = 5.00
 
 # --- SAFEST combo ---
-MIN_CONFIDENCE = 80  # More relaxed to allow more matches
+MIN_CONFIDENCE = 70  # Relaxed to allow more matches
 MAX_CONFIDENCE = 100
 SAFE_MODE = True
 SAFE_PICK_COUNT = 3
-SAFE_ODDS_MIN = 1.2  # More relaxed
-SAFE_ODDS_MAX = 4.0  # More relaxed
+SAFE_ODDS_MIN = 1.1  # More relaxed
+SAFE_ODDS_MAX = 6.0
 
 API_KEY = "fc80ba539cc7b00336a8211ccad28d44"
 API_HOST = "v3.football.api-sports.io"
@@ -39,6 +39,7 @@ BASE_ODDS_URL = "https://v3.football.api-sports.io/odds"
 st.header("⚽ Today's Real Smart Football Picks")
 
 show_raw = st.checkbox("🔍 Show Raw Odds Data")
+
 
 def fetch_predicted_odds():
     today = datetime.today().strftime('%Y-%m-%d')
@@ -92,18 +93,17 @@ def fetch_predicted_odds():
 
                         if SAFE_ODDS_MIN <= odd <= SAFE_ODDS_MAX:
                             confidence = random.randint(MIN_CONFIDENCE, MAX_CONFIDENCE)
-                            if confidence >= MIN_CONFIDENCE:
-                                picks.append({
-                                    "match": match_name,
-                                    "market": market,
-                                    "selection": selection,
-                                    "odds": odd,
-                                    "confidence": confidence
-                                })
-                                combined_odds *= odd
+                            picks.append({
+                                "match": match_name,
+                                "market": market,
+                                "selection": selection,
+                                "odds": odd,
+                                "confidence": confidence
+                            })
+                            combined_odds *= odd
 
-                                if len(picks) == SAFE_PICK_COUNT:
-                                    return picks, combined_odds
+                            if len(picks) == SAFE_PICK_COUNT:
+                                return picks, combined_odds
         except Exception as e:
             if show_raw:
                 st.error(f"Error parsing a match: {e}")
@@ -113,18 +113,31 @@ def fetch_predicted_odds():
 
 if st.button("🔄 Fetch Smart Picks"):
     picks, combined_odds = fetch_predicted_odds()
+
     if not picks:
-        st.warning("⚠️ No suitable matches found. Try again later or relax filters.")
+        st.warning("⚠️ No suitable matches found. Relaxing filters and retrying...")
+        SAFE_PICK_COUNT = 2
+        SAFE_ODDS_MIN = 1.01
+        SAFE_ODDS_MAX = 10.0
+        MIN_CONFIDENCE = 60
+        picks, combined_odds = fetch_predicted_odds()
+
+    if not picks:
+        st.error("🚫 Still no suitable picks found.")
     else:
         for i, pick in enumerate(picks, 1):
-            st.markdown(f"**Pick {i}:** {pick['match']}")
-            st.markdown(f"**Market:** {pick['market']} | **Selection:** {pick['selection']}")
-            st.markdown(f"**Confidence:** {pick['confidence']}% | **Odds:** {pick['odds']}")
+            st.markdown(f"### ✅ Pick {i}")
+            st.markdown(f"**Match:** {pick['match']}")
+            st.markdown(f"**Market:** {pick['market']}")
+            st.markdown(f"**Selection:** {pick['selection']}")
+            st.markdown(f"**Confidence:** {pick['confidence']}%")
+            st.markdown(f"**Odds:** {pick['odds']}")
             st.markdown("---")
 
-        st.info(f"📦 Combined Odds: {combined_odds:.2f}")
+        st.success(f"🔥 Combined Odds: {combined_odds:.2f}")
         if combined_odds >= TARGET_ODDS:
             st.success("✅ Target Reached!")
         else:
             st.warning("⚠️ Odds below 5. Try again.")
+
 
